@@ -7,12 +7,18 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
-type GeoPoint struct {
+type GeoPointDB struct {
 	Lng  float64 `json:"lng"`
 	Lat  float64 `json:"lat"`
-	SRID int     `json:"srid,omitempty"` // default 4326
+}
+
+type GeoPoint struct {
+	GeoPointDB
+	SRID int     `json:"srid"` // default 4326
 }
 
 func (p *GeoPoint) SetSRID(srid int) *GeoPoint {
@@ -22,26 +28,35 @@ func (p *GeoPoint) SetSRID(srid int) *GeoPoint {
 
 func NewGeoPoint(lng, lat float64) *GeoPoint {
 	return &GeoPoint{
-		Lng:  lng,
-		Lat:  lat,
+		GeoPointDB:GeoPointDB{
+			Lng:  lng,
+			Lat:  lat,
+		},
 		SRID: 4326,
 	}
 }
 
 func NewGeoPointWithSRID(lng, lat float64, srid int) *GeoPoint {
 	return &GeoPoint{
-		Lng:  lng,
-		Lat:  lat,
-		SRID: srid,
+		GeoPointDB:GeoPointDB{
+			Lng:  lng,
+			Lat:  lat,
+		},
+		SRID:srid,
 	}
 }
 
 func (p *GeoPoint) String() string {
-	srid := p.SRID
-	if srid == 0 {
-		srid = 4326
-	}
-	return fmt.Sprintf("SRID=%d;POINT(%v %v)", srid, p.Lng, p.Lat)
+	/* SRID=%d;POINT(%v %v) */
+	var builder strings.Builder
+	builder.WriteString("SRID=")
+	builder.WriteString(strconv.Itoa(p.SRID))
+	builder.WriteString(";POINT(")
+	builder.WriteString(strconv.FormatFloat(p.Lng, 'g', -1, 64))
+	builder.WriteByte(' ')
+	builder.WriteString(strconv.FormatFloat(p.Lat, 'g', -1, 64))
+	builder.WriteByte(')')
+	return builder.String()
 }
 
 func (p *GeoPoint) Scan(val interface{}) error {
