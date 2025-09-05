@@ -3,63 +3,71 @@ package gormGIS_test
 import (
 	"fmt"
 
-	"github.com/jinzhu/gorm"
 	_ "github.com/lib/pq"
-	"github.com/nferruzzi/gormGIS"
-
+	"github.com/xue-ding-e/gormGIS"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 	"testing"
 )
 
 var (
-	DB gorm.DB
+	DB *gorm.DB
 )
 
 func init() {
 	var err error
 	fmt.Println("testing postgres...")
-	DB, err = gorm.Open("postgres", "user=gorm dbname=gormGIS sslmode=disable")
-	DB.LogMode(true)
-
-	DB.Exec("CREATE EXTENSION postgis")
-	DB.Exec("CREATE EXTENSION postgis_topology")
-
-	//DB.LogMode(false)
-
+	DB, err = gorm.Open(postgres.Open("user=gorm dbname=gormGIS sslmode=disable"), &gorm.Config{})
+	DB.Debug()
 	if err != nil {
 		panic(fmt.Sprintf("No error should happen when connect database, but got %+v", err))
 	}
 
-	DB.DB().SetMaxIdleConns(10)
+	DB.Exec("CREATE EXTENSION IF NOT EXISTS postgis")
+	DB.Exec("CREATE EXTENSION IF NOT EXISTS postgis_topology")
 }
 
 type TestPoint struct {
-	Location gormGIS.GeoPoint `sql:"type:geometry(Geometry,4326)"`
+	ID       uint                `gorm:"primarykey"`
+	Location gormGIS.GeoPoint   `gorm:"type:geometry(Point,4326)"`
 }
 
 func TestGeoPoint(t *testing.T) {
-	if DB.CreateTable(&TestPoint{}) == nil {
-		t.Errorf("Can't create table")
+	// 自动迁移表结构
+	err := DB.AutoMigrate(&TestPoint{})
+	if err != nil {
+		t.Errorf("Can't create table: %v", err)
+		return
 	}
 
 	p := TestPoint{
 		Location: gormGIS.GeoPoint{
-			Lat: 43.76857094631136,
-			Lng: 11.292383687705296,
+			GeoPointDB: gormGIS.GeoPointDB{
+				Lat: 43.76857094631136,
+				Lng: 11.292383687705296,
+			},
+			SRID: 4326,
 		},
 	}
 
-	if DB.Create(&p) == nil {
-		t.Errorf("Can't create row")
+	err = DB.Create(&p).Error
+	if err != nil {
+		t.Errorf("Can't create row: %v", err)
+		return
 	}
 
 	var res TestPoint
-	DB.First(&res)
+	err = DB.First(&res).Error
+	if err != nil {
+		t.Errorf("Can't query row: %v", err)
+		return
+	}
 
 	if res.Location.Lat != 43.76857094631136 {
-		t.Errorf("Latitude not correct")
+		t.Errorf("Latitude not correct, expected %f, got %f", 43.76857094631136, res.Location.Lat)
 	}
 
 	if res.Location.Lng != 11.292383687705296 {
-		t.Errorf("Longitude not correct")
+		t.Errorf("Longitude not correct, expected %f, got %f", 11.292383687705296, res.Location.Lng)
 	}
 }

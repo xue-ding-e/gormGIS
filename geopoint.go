@@ -6,19 +6,19 @@ import (
 	"database/sql/driver"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
+	"errors"
 	"strconv"
 	"strings"
 )
 
 type GeoPointDB struct {
-	Lng  float64 `json:"lng"`
-	Lat  float64 `json:"lat"`
+	Lng float64 `json:"lng"`
+	Lat float64 `json:"lat"`
 }
 
 type GeoPoint struct {
 	GeoPointDB
-	SRID int     `json:"srid"` // default 4326
+	SRID int `json:"srid"` // default 4326
 }
 
 func (p *GeoPoint) SetSRID(srid int) *GeoPoint {
@@ -28,9 +28,9 @@ func (p *GeoPoint) SetSRID(srid int) *GeoPoint {
 
 func NewGeoPoint(lng, lat float64) *GeoPoint {
 	return &GeoPoint{
-		GeoPointDB:GeoPointDB{
-			Lng:  lng,
-			Lat:  lat,
+		GeoPointDB: GeoPointDB{
+			Lng: lng,
+			Lat: lat,
 		},
 		SRID: 4326,
 	}
@@ -38,11 +38,11 @@ func NewGeoPoint(lng, lat float64) *GeoPoint {
 
 func NewGeoPointWithSRID(lng, lat float64, srid int) *GeoPoint {
 	return &GeoPoint{
-		GeoPointDB:GeoPointDB{
-			Lng:  lng,
-			Lat:  lat,
+		GeoPointDB: GeoPointDB{
+			Lng: lng,
+			Lat: lat,
 		},
-		SRID:srid,
+		SRID: srid,
 	}
 }
 
@@ -59,7 +59,7 @@ func (p *GeoPoint) String() string {
 	return builder.String()
 }
 
-func (p *GeoPoint) Scan(val interface{}) error {
+func (p *GeoPointDB) Scan(val interface{}) error {
 	if val == nil {
 		return nil
 	}
@@ -67,14 +67,13 @@ func (p *GeoPoint) Scan(val interface{}) error {
 	var b []byte
 	var err error
 
-	// 处理不同类型的输入
 	switch v := val.(type) {
 	case []uint8:
 		b, err = hex.DecodeString(string(v))
 	case string:
 		b, err = hex.DecodeString(v)
 	default:
-		return fmt.Errorf("cannot scan %T into GeoPoint", val)
+		return errors.New("invalid type")
 	}
 
 	if err != nil {
@@ -94,7 +93,7 @@ func (p *GeoPoint) Scan(val interface{}) error {
 	case 1:
 		byteOrder = binary.LittleEndian
 	default:
-		return fmt.Errorf("Invalid byte order %d", wkbByteOrder)
+		return errors.New("invalid byte order")
 	}
 
 	var wkbGeometryType uint64
